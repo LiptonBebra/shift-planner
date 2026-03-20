@@ -1,0 +1,11 @@
+{
+  "name": "shift-planner",
+  "version": "1.0.0",
+  "description": "Shift Planner with Tailwind CSS",
+  "scripts": {
+    "build:css": "tailwindcss -i ./web/css/input.css -o ./web/css/style.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0"
+  }
+}
