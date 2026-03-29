@@ -71,7 +71,6 @@ async function login() {
             return;
         }
 
-        // Проверка пароля (в реальном проекте здесь был бы запрос к серверу)
         if (password !== 'admin123') {
             showError('Неверный пароль');
             return;
@@ -107,6 +106,13 @@ function showMainApp() {
             </svg>
         </button>
     `;
+
+    const filterUserContainer = document.getElementById('filter-user-container');
+    if (currentUser.role === 'admin') {
+        filterUserContainer.style.display = 'block';
+    } else {
+        filterUserContainer.style.display = 'none';
+    }
 
     if (currentUser.role === 'admin') {
         document.getElementById('admin-controls').style.display = 'block';
@@ -219,17 +225,20 @@ async function loadShifts() {
 
         displayShifts(paginatedShifts);
         document.getElementById('shifts-count').textContent = `Всего: ${allShifts.length}`;
+        updatePagination();
     } catch (error) {
         console.error('Ошибка загрузки смен:', error);
     }
 }
 
 // Отображение смен
+// Отображение смен
 function displayShifts(shifts) {
     const container = document.getElementById('shifts-list');
 
     if (shifts.length === 0) {
         container.innerHTML = '<div class="text-center py-12 text-gray-500">Нет смен для отображения</div>';
+        updatePagination();
         return;
     }
 
@@ -268,7 +277,7 @@ function displayShifts(shifts) {
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${shift.date}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${shift.user_name}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${shift.start_time ? shift.start_time.substring(0,5) : '--:--'}</td>
-<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${shift.end_time ? shift.end_time.substring(0,5) : '--:--'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-600">${shift.end_time ? shift.end_time.substring(0,5) : '--:--'}</td>
                 <td class="px-6 py-4 whitespace-nowrap">
                     ${currentUser.role === 'admin'
             ? `<select onchange="updateShiftStatus(${shift.id}, this.value)" 
@@ -279,7 +288,7 @@ function displayShifts(shifts) {
                            </select>`
             : `<span class="px-3 py-1 rounded-full text-sm font-medium ${statusColors[shift.status]}">${statusText[shift.status]}</span>`
         }
-                </td>
+                 </td>
         `;
 
         if (currentUser.role === 'admin') {
@@ -287,18 +296,21 @@ function displayShifts(shifts) {
                 <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button onclick="editShift(${shift.id})" class="text-blue-600 hover:text-blue-900 mr-3">✏️</button>
                     <button onclick="deleteShift(${shift.id})" class="text-red-600 hover:text-red-900">🗑️</button>
-                </td>
+                 </td>
             `;
         }
 
-        html += '</tr>';
+        html += ' </tr>';
     });
 
-    html += '</tbody></table>';
+    html += '</tbody> </table>';
     container.innerHTML = html;
+
+    // Обновляем пагинацию
+    updatePagination();
+
 }
 
-// Фильтры
 // Фильтры
 function applyFilters() {
     let filtered = [...allShifts];
@@ -319,13 +331,51 @@ function applyFilters() {
 
     displayShifts(paginatedShifts);
     document.getElementById('shifts-count').textContent = `Всего: ${allShifts.length}`;
+    updatePagination();
+
+    // ДОБАВЛЯЕМ КНОПКИ ПРЯМО КАК В КОНСОЛИ
+    if (totalPages > 1) {
+        const container = document.getElementById('shifts-list');
+        const paginationHtml = `
+            <div class="pagination flex justify-between items-center mt-6 px-4 py-3 bg-gray-50 rounded-lg">
+                <div class="text-sm text-gray-700">
+                    Страница ${currentPage} из ${totalPages}
+                </div>
+                <div class="flex space-x-2">
+                    <button onclick="changePage(${currentPage - 1})" 
+                        ${currentPage <= 1 ? 'disabled' : ''}
+                        class="px-4 py-2 bg-white border rounded-md text-sm ${currentPage <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
+                        ← Назад
+                    </button>
+                    <button onclick="changePage(${currentPage + 1})" 
+                        ${currentPage >= totalPages ? 'disabled' : ''}
+                        class="px-4 py-2 bg-white border rounded-md text-sm ${currentPage >= totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}">
+                        Вперед →
+                    </button>
+                </div>
+            </div>
+        `;
+
+        // Удаляем старые кнопки если были
+        const oldPagination = container.querySelector('.pagination');
+        if (oldPagination) oldPagination.remove();
+
+        // Добавляем новые
+        container.insertAdjacentHTML('beforeend', paginationHtml);
+    } else {
+        // Удаляем кнопки если страница одна
+        const container = document.getElementById('shifts-list');
+        const oldPagination = container.querySelector('.pagination');
+        if (oldPagination) oldPagination.remove();
+    }
 }
 
 function resetFilters() {
     document.getElementById('filter-date').value = '';
     document.getElementById('filter-user').value = '';
-    loadShifts(); // Перезагружаем все смены
+    loadShifts();
 }
+
 // Обновление статуса
 async function updateShiftStatus(id, status) {
     const shift = allShifts.find(s => s.id === id);
@@ -364,25 +414,21 @@ async function deleteShift(id) {
     }
 }
 
-// Редактирование (заглушка)
 // Редактирование смены
 async function editShift(id) {
     const shift = allShifts.find(s => s.id === id);
     if (!shift) return;
 
-    // Заполняем форму данными
     document.getElementById('shift-user').value = shift.user_id;
     document.getElementById('shift-date').value = shift.date;
     document.getElementById('shift-start').value = shift.start_time;
     document.getElementById('shift-end').value = shift.end_time;
 
-    // Меняем кнопку на "Обновить"
     const form = document.getElementById('shift-form');
     const submitBtn = form.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = 'Обновить смену';
 
-    // Временно меняем обработчик формы
     const originalSubmit = form.onsubmit;
     form.onsubmit = async (e) => {
         e.preventDefault();
@@ -412,7 +458,6 @@ async function editShift(id) {
 
             if (response.ok) {
                 alert('Смена обновлена');
-                // Возвращаем форму в исходное состояние
                 form.reset();
                 submitBtn.textContent = originalText;
                 form.onsubmit = originalSubmit;
@@ -424,8 +469,6 @@ async function editShift(id) {
         } catch (error) {
             console.error('Ошибка:', error);
         }
-
-
     };
 }
 
@@ -433,18 +476,15 @@ async function editShift(id) {
 function showWeekShifts() {
     const today = new Date();
     const startOfWeek = new Date(today);
-    startOfWeek.setDate(today.getDate() - today.getDay() + 1); // Понедельник
+    startOfWeek.setDate(today.getDate() - today.getDay() + 1);
     const endOfWeek = new Date(today);
-    endOfWeek.setDate(today.getDate() - today.getDay() + 7); // Воскресенье
-
-    const formatDate = (date) => date.toISOString().split('T')[0];
+    endOfWeek.setDate(today.getDate() - today.getDay() + 7);
 
     let filtered = allShifts.filter(s => {
         const shiftDate = new Date(s.date);
         return shiftDate >= startOfWeek && shiftDate <= endOfWeek;
     });
 
-    // Обновляем отображение
     allShifts = filtered;
     totalPages = Math.ceil(allShifts.length / itemsPerPage);
     currentPage = 1;
@@ -455,4 +495,62 @@ function showWeekShifts() {
 
     displayShifts(paginatedShifts);
     document.getElementById('shifts-count').textContent = `Всего: ${allShifts.length} (текущая неделя)`;
+    updatePagination();
 }
+
+// Смена страницы
+function changePage(newPage) {
+    if (newPage < 1 || newPage > totalPages) return;
+    currentPage = newPage;
+    const start = (currentPage - 1) * itemsPerPage;
+    const end = start + itemsPerPage;
+    const paginatedShifts = allShifts.slice(start, end);
+    displayShifts(paginatedShifts);
+}
+
+// Обновление пагинации
+function updatePagination() {
+    const paginationDiv = document.getElementById('pagination');
+    const currentPageSpan = document.getElementById('current-page-display');
+    const totalPagesSpan = document.getElementById('total-pages-display');
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+
+    if (totalPages > 1) {
+        paginationDiv.classList.remove('hidden');
+        currentPageSpan.textContent = currentPage;
+        totalPagesSpan.textContent = totalPages;
+
+        // Обновляем состояние кнопок
+        prevBtn.disabled = (currentPage <= 1);
+        prevBtn.className = `px-4 py-2 bg-white border rounded-md text-sm ${currentPage <= 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`;
+
+        nextBtn.disabled = (currentPage >= totalPages);
+        nextBtn.className = `px-4 py-2 bg-white border rounded-md text-sm ${currentPage >= totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-700 hover:bg-gray-50'}`;
+    } else {
+        paginationDiv.classList.add('hidden');
+    }
+}
+
+// Обработчики кнопок пагинации
+document.addEventListener('DOMContentLoaded', () => {
+    const prevBtn = document.getElementById('prev-page-btn');
+    const nextBtn = document.getElementById('next-page-btn');
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            if (currentPage > 1) {
+                changePage(currentPage - 1);
+            }
+        });
+    }
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            if (currentPage < totalPages) {
+                changePage(currentPage + 1);
+            }
+        });
+    }
+});
+
